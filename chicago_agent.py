@@ -110,20 +110,20 @@ def fetch_chicago_events() -> list:
     Returns a list of event dicts from Ticketmaster.
     """
 
-    # Ambassador Theatre, NYC — Ticketmaster venue ID
-    # Verified: KovZpZAFnJ7a  (Ambassador Theatre, 219 W 49th St, New York)
-    AMBASSADOR_VENUE_ID = "KovZpZAFnJ7a"
+     # Ambassador Theatre Ticketmaster venue ID (from ticketmaster.com/ambassador-theatre-tickets-new-york/venue/237850)
+    # Artist ID for Chicago the Musical NY  (from ticketmaster.com/chicago-the-musical-ny-tickets/artist/2503066)
+    AMBASSADOR_VENUE_ID   = "237850"
+    CHICAGO_ATTRACTION_ID = "2503066"
 
     params = {
-        "apikey":            TM_API_KEY,
-        "keyword":           "Chicago",
-        "classificationName":"Arts & Theatre",
-        "venueId":           AMBASSADOR_VENUE_ID,
-        "startDateTime":     f"{DATE_FROM}T00:00:00Z",
-        "endDateTime":       f"{DATE_TO}T23:59:59Z",
-        "countryCode":       "US",
-        "size":              20,
-        "sort":              "date,asc",
+        "apikey":        TM_API_KEY,
+        "attractionId":  CHICAGO_ATTRACTION_ID,   # targets this exact show, not just keyword
+        "venueId":       AMBASSADOR_VENUE_ID,      # pins it to Ambassador Theatre, NYC
+        "startDateTime": f"{DATE_FROM}T00:00:00Z",
+        "endDateTime":   f"{DATE_TO}T23:59:59Z",
+        "countryCode":   "US",
+        "size":          20,
+        "sort":          "date,asc",
     }
 
     try:
