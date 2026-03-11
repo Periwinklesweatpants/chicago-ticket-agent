@@ -1,0 +1,66 @@
+# ============================================================
+# .github/workflows/ticket_agent.yml
+#
+# Runs the Chicago ticket agent every 30 minutes
+# between 7:00 AM and 11:00 PM Eastern Time (ET).
+#
+# GitHub Actions schedules run in UTC.
+# Eastern Time is UTC-4 in summer (EDT, April).
+# So 7:00 AM ET = 11:00 AM UTC, 11:00 PM ET = 3:00 AM UTC next day.
+#
+# The cron below fires at :00 and :30 of every hour from
+# 11:00 UTC through 03:00 UTC (covering 7AM–11PM ET in April).
+# ============================================================
+
+name: Chicago Ticket Agent
+
+on:
+  schedule:
+    # Every hour at :00 and :30, from 11:00 UTC to 03:00 UTC
+    # (= 7:00 AM to 11:00 PM Eastern Daylight Time in April)
+    - cron: '0,30 11-23 * * *'   # 11:00 AM – 11:30 PM UTC  (7AM – 7:30PM ET)
+    - cron: '0,30 0-3  * * *'    # 12:00 AM – 3:30 AM UTC   (8PM – 11:30PM ET)
+
+  # Also allows you to trigger a manual run from the GitHub website
+  workflow_dispatch:
+
+jobs:
+  search-tickets:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Download your repository files onto the GitHub server
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      # 2. Install Python
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # 3. Install the one library the agent needs
+      - name: Install dependencies
+        run: pip install requests
+
+      # 4. Run the agent (single-shot — GitHub calls this on schedule)
+      #    Secrets are injected as environment variables from GitHub's vault.
+      #    They are NEVER visible in logs or to the public.
+      - name: Run ticket agent
+        env:
+          SEATGEEK_CLIENT_ID:     ${{ secrets.SEATGEEK_CLIENT_ID }}
+          SEATGEEK_CLIENT_SECRET: ${{ secrets.SEATGEEK_CLIENT_SECRET }}
+          SMTP_SENDER_EMAIL:      ${{ secrets.SMTP_SENDER_EMAIL }}
+          SMTP_APP_PASSWORD:      ${{ secrets.SMTP_APP_PASSWORD }}
+          ALERT_EMAIL:            ${{ secrets.ALERT_EMAIL }}
+        run: python chicago_agent.py
+
+      # 5. Save the seen_listings.json back to the repo so the agent
+      #    remembers which tickets it already alerted you about.
+      - name: Save seen listings
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add seen_listings.json || true
+          git diff-index --quiet HEAD || git commit -m "chore: update seen listings"
+          git push
