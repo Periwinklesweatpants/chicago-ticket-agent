@@ -1,51 +1,55 @@
 # ============================================================
-# .github/workflows/ticket_agent.yml
+# .github/workflows/ticket_agent.yml  —  FIXED VERSION
 #
-# Runs the Chicago ticket agent every 30 minutes
-# between 7:00 AM and 11:00 PM Eastern Time (ET).
-#
-# GitHub Actions schedules run in UTC.
-# Eastern Time is UTC-4 in summer (EDT, April).
-# So 7:00 AM ET = 11:00 AM UTC, 11:00 PM ET = 3:00 AM UTC next day.
-#
-# The cron below fires at :00 and :30 of every hour from
-# 11:00 UTC through 03:00 UTC (covering 7AM–11PM ET in April).
+# Key fixes from original:
+#   1. Added  permissions: contents: write  so GitHub allows the
+#      git push that saves seen_listings.json back to the repo.
+#   2. Added  token: ${{ secrets.GITHUB_TOKEN }}  to the checkout
+#      step so the git push is authenticated properly.
+#   3. Used  || true  on git commit so the step doesn't fail if
+#      there's nothing new to commit (no new listings found).
 # ============================================================
 
 name: Chicago Ticket Agent
 
 on:
   schedule:
-    # Every hour at :00 and :30, from 11:00 UTC to 03:00 UTC
-    # (= 7:00 AM to 11:00 PM Eastern Daylight Time in April)
-    - cron: '0,30 11-23 * * *'   # 11:00 AM – 11:30 PM UTC  (7AM – 7:30PM ET)
-    - cron: '0,30 0-3  * * *'    # 12:00 AM – 3:30 AM UTC   (8PM – 11:30PM ET)
+    # Every 30 min, 7:00 AM – 11:00 PM Eastern Daylight Time (UTC-4, April)
+    # 7AM ET  = 11:00 UTC  /  11PM ET = 03:00 UTC next day
+    - cron: '0,30 11-23 * * *'   # 11:00 AM – 11:30 PM UTC  (7AM–7:30PM ET)
+    - cron: '0,30 0-3  * * *'    # 12:00 AM – 3:30 AM UTC   (8PM–11:30PM ET)
 
-  # Also allows you to trigger a manual run from the GitHub website
+  # Lets you trigger a manual run from the GitHub Actions tab anytime
   workflow_dispatch:
+
+# ── THIS IS THE KEY FIX ──────────────────────────────────────
+# Without this, github-actions[bot] cannot push back to the repo
+permissions:
+  contents: write
 
 jobs:
   search-tickets:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Download your repository files onto the GitHub server
+      # 1. Check out your repo files onto the GitHub server
+      #    token: here is required so the later git push is authenticated
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      # 2. Install Python
+      # 2. Install Python 3.12
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      # 3. Install the one library the agent needs
+      # 3. Install the requests library
       - name: Install dependencies
         run: pip install requests
 
-      # 4. Run the agent (single-shot — GitHub calls this on schedule)
-      #    Secrets are injected as environment variables from GitHub's vault.
-      #    They are NEVER visible in logs or to the public.
+      # 4. Run the ticket agent (credentials come from your GitHub Secrets)
       - name: Run ticket agent
         env:
           SEATGEEK_CLIENT_ID:     ${{ secrets.SEATGEEK_CLIENT_ID }}
@@ -55,12 +59,13 @@ jobs:
           ALERT_EMAIL:            ${{ secrets.ALERT_EMAIL }}
         run: python chicago_agent.py
 
-      # 5. Save the seen_listings.json back to the repo so the agent
+      # 5. Commit seen_listings.json back to the repo so the agent
       #    remembers which tickets it already alerted you about.
+      #    "|| true" means: if there's nothing new to commit, don't fail.
       - name: Save seen listings
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add seen_listings.json || true
-          git diff-index --quiet HEAD || git commit -m "chore: update seen listings"
+          git add seen_listings.json
+          git commit -m "chore: update seen listings [skip ci]" || true
           git push
