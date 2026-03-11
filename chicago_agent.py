@@ -50,7 +50,7 @@ ALERT_EMAIL            = _require("ALERT_EMAIL")
 DATE_FROM        = "2026-04-05"
 DATE_TO          = "2026-04-10"
 TICKETS_NEEDED   = 3
-MAX_PRICE        = 70.00     # per ticket, after all fees
+MAX_PRICE        = 150.00     # per ticket, after all fees
 
 # ── Seat quality filters ──────────────────────────────────────
 EXCLUDED_SECTION_KEYWORDS = [
