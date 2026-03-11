@@ -1,13 +1,5 @@
 # ============================================================
-# .github/workflows/ticket_agent.yml  —  FIXED VERSION
-#
-# Key fixes from original:
-#   1. Added  permissions: contents: write  so GitHub allows the
-#      git push that saves seen_listings.json back to the repo.
-#   2. Added  token: ${{ secrets.GITHUB_TOKEN }}  to the checkout
-#      step so the git push is authenticated properly.
-#   3. Used  || true  on git commit so the step doesn't fail if
-#      there's nothing new to commit (no new listings found).
+# .github/workflows/ticket_agent.yml
 # ============================================================
 
 name: Chicago Ticket Agent
@@ -15,53 +7,40 @@ name: Chicago Ticket Agent
 on:
   schedule:
     # Every 30 min, 7:00 AM – 11:00 PM Eastern Daylight Time (UTC-4, April)
-    # 7AM ET  = 11:00 UTC  /  11PM ET = 03:00 UTC next day
     - cron: '0,30 11-23 * * *'   # 11:00 AM – 11:30 PM UTC  (7AM–7:30PM ET)
     - cron: '0,30 0-3  * * *'    # 12:00 AM – 3:30 AM UTC   (8PM–11:30PM ET)
 
-  # Lets you trigger a manual run from the GitHub Actions tab anytime
-  workflow_dispatch:
+  workflow_dispatch:   # allows manual runs from the Actions tab
 
-# ── THIS IS THE KEY FIX ──────────────────────────────────────
-# Without this, github-actions[bot] cannot push back to the repo
 permissions:
-  contents: write
+  contents: write      # required so the workflow can commit seen_listings.json
 
 jobs:
   search-tickets:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Check out your repo files onto the GitHub server
-      #    token: here is required so the later git push is authenticated
       - name: Check out repository
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      # 2. Install Python 3.12
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      # 3. Install the requests library
       - name: Install dependencies
         run: pip install requests
 
-      # 4. Run the ticket agent (credentials come from your GitHub Secrets)
       - name: Run ticket agent
         env:
-          SEATGEEK_CLIENT_ID:     ${{ secrets.SEATGEEK_CLIENT_ID }}
-          SEATGEEK_CLIENT_SECRET: ${{ secrets.SEATGEEK_CLIENT_SECRET }}
-          SMTP_SENDER_EMAIL:      ${{ secrets.SMTP_SENDER_EMAIL }}
-          SMTP_APP_PASSWORD:      ${{ secrets.SMTP_APP_PASSWORD }}
-          ALERT_EMAIL:            ${{ secrets.ALERT_EMAIL }}
+          TICKETMASTER_API_KEY: ${{ secrets.TICKETMASTER_API_KEY }}
+          SMTP_SENDER_EMAIL:    ${{ secrets.SMTP_SENDER_EMAIL }}
+          SMTP_APP_PASSWORD:    ${{ secrets.SMTP_APP_PASSWORD }}
+          ALERT_EMAIL:          ${{ secrets.ALERT_EMAIL }}
         run: python chicago_agent.py
 
-      # 5. Commit seen_listings.json back to the repo so the agent
-      #    remembers which tickets it already alerted you about.
-      #    "|| true" means: if there's nothing new to commit, don't fail.
       - name: Save seen listings
         run: |
           git config user.name  "github-actions[bot]"
