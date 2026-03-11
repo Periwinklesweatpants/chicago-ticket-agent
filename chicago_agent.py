@@ -326,43 +326,34 @@ def send_email(pairs: list) -> bool:
 # ══════════════════════════════════════════════════════════════
 def main():
     log.info("=" * 55)
-    log.info("Chicago Ticket Agent starting  [%s → %s]", DATE_FROM, DATE_TO)
-    log.info("Budget: $%.2f/ticket | Seats needed: %d", MAX_PRICE, TICKETS_NEEDED)
+    log.info("DIAGNOSTIC MODE — printing raw API responses")
 
-    # 1. Find events
-    raw_events   = fetch_events()
-    valid_events = [ev for ev in raw_events if is_valid_event(ev)]
-    log.info("%d/%d events passed venue/show check.", len(valid_events), len(raw_events))
+    # Step 1: raw event search with NO venue filter
+    import json
+    params = {
+        "client_id": SEATGEEK_CLIENT_ID,
+        "q": "Chicago",
+        "venue.city": "New York",
+        "per_page": 10,
+    }
+    r = requests.get("https://api.seatgeek.com/2/events", params=params, timeout=15)
+    log.info("Events API status: %s", r.status_code)
+    events = r.json().get("events", [])
+    log.info("Raw events returned: %d", len(events))
+    for ev in events:
+        log.info("  EVENT: '%s' | venue: '%s' | date: %s | id: %s",
+            ev.get("title"), ev.get("venue", {}).get("name"),
+            ev.get("datetime_local"), ev.get("id"))
 
-    if not valid_events:
-        log.info("No matching events found. Done.")
-        return
-
-    # 2. Fetch & filter listings for each event
-    all_qualifying: list[tuple[dict, dict]] = []
-    for ev in valid_events:
-        raw      = fetch_listings(ev["id"])
-        filtered = filter_listings(raw)
-        for lst in filtered:
-            if not lst.get("url"):
-                lst["url"] = ev.get("url", "https://seatgeek.com")
-            all_qualifying.append((lst, ev))
-
-    log.info("Total qualifying listings across all events: %d", len(all_qualifying))
-
-    if not all_qualifying:
-        log.info("No listings met all criteria. Done.")
-        return
-
-    # 3. Deduplicate
-    new_listings = filter_new(all_qualifying)
-    if not new_listings:
-        log.info("All qualifying listings already alerted. Done.")
-        return
-
-    # 4. Send alert
-    send_email(new_listings)
-    log.info("Run complete.")
+    # Step 2: if any events found, try fetching listings for the first one
+    if events:
+        eid = events[0]["id"]
+        log.info("Trying /listings for event id %s ...", eid)
+        r2 = requests.get("https://api.seatgeek.com/2/listings",
+            params={"client_id": SEATGEEK_CLIENT_ID, "event_id": eid, "per_page": 5},
+            timeout=15)
+        log.info("Listings API status: %s", r2.status_code)
+        log.info("Listings raw response: %s", r2.text[:500])
 
 if __name__ == "__main__":
     main()
